@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+prefs.toml
+jobs.db
+applications/
+resume*
+*.pdf

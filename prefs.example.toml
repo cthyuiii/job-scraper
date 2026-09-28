@@ -1,0 +1,29 @@
+# Copy to prefs.toml and edit. prefs.toml is gitignored.
+# Anything you leave out falls back to the value here.
+
+# Job titles to search. Leave empty and the LLM picks 3 from your resume.
+search_terms = []                        # e.g. ["data analyst", "business intelligence analyst"]
+# Companies you most want to work at. Each is searched directly and shown first in review.
+companies = []                           # e.g. ["Stripe", "Grab", "Canva"]
+location = "San Francisco, CA"
+country = "usa"                          # Indeed country, e.g. "singapore", "uk", "india"
+remote_only = false
+sites = ["indeed", "linkedin"]           # also: glassdoor, zip_recruiter (US only), bayt, naukri, google (flaky)
+max_age_days = 90                        # oldest posting to consider
+results_per_search = 25
+# LinkedIn returning 0 jobs means it's blocking you. Add proxies (used for every site):
+proxies = []                             # e.g. ["user:pass@host:port"]
+
+# Titles containing any of these are dropped before the LLM sees them.
+exclude_title_keywords = ["intern", "principal"]
+min_salary = 0                           # annual, local currency; only applied when a listing shows salary
+
+# Plain-English preferences the LLM weighs when scoring.
+about_me = """
+I want hands-on work in my field, hybrid or remote.
+Prefer product companies over agencies. No roles requiring security clearance.
+"""
+
+model = "gemma3:12b"                     # any model from `ollama list`
+min_score = 60                           # only review jobs scoring at least this
+top_n = 15                               # max jobs to review per run
