@@ -5,17 +5,34 @@
 search_terms = []                        # e.g. ["data analyst", "business intelligence analyst"]
 # Companies you most want to work at. Each is searched directly and shown first in review.
 companies = []                           # e.g. ["Stripe", "Grab", "Canva"]
-location = "San Francisco, CA"
-country = "usa"                          # Indeed country, e.g. "singapore", "uk", "india"
-remote_only = false
-sites = ["indeed", "linkedin"]           # also: glassdoor, zip_recruiter (US only), bayt, naukri, google (flaky)
+# Where to search. The app's Search settings panel edits these three for you.
+country = "usa"                          # e.g. "usa", "uk", "canada", "singapore", "india" (72 countries)
+location = "California"                  # state, region or city; "" searches the whole country
+work_types = ["remote", "hybrid", "on-site"]  # jobs of other types are listed as Excluded
+# Job sites. Only Indeed and LinkedIn worked when tested (Sep 2026, jobspy 1.1.82).
+# The others are listed so you can try them; remove the # to turn one on.
+sites = [
+  "indeed",           # worldwide, uses `country` below
+  "linkedin",         # worldwide; blocks heavy use, see `proxies`
+  # "zip_recruiter",  # US and Canada; blocked with 403 by bot protection
+  # "bayt",           # Middle East; blocked with 403 by bot protection
+  # "naukri",         # India; asks for a CAPTCHA
+  # "glassdoor",      # broken in jobspy ("location not parsed")
+  # "google",         # broken in jobspy (returns nothing)
+  # "bdjobs",         # Bangladesh; broken in jobspy (crashes)
+]
 max_age_days = 90                        # oldest posting to consider
-results_per_search = 25
+# Most jobs per scan, split evenly over every search (job titles x companies x sites).
+# Sites rank recent postings first; a bigger number reaches further back. After raising it,
+# run once with --full-search. LinkedIn may start blocking above a few hundred.
+max_jobs = 1000
 # LinkedIn returning 0 jobs means it's blocking you. Add proxies (used for every site):
 proxies = []                             # e.g. ["user:pass@host:port"]
 
-# Titles containing any of these are dropped before the LLM sees them.
-exclude_title_keywords = ["intern", "principal"]
+# Title words, whole words in any case ("intern" matches "Intern", not "Internal"; add "internship" too).
+# Jobs failing these are listed as Excluded and never scored. The app's Search settings edit both.
+include_title_keywords = []             # a title needs one of these, e.g. ["intern", "internship"]; also added to searches
+exclude_title_keywords = ["principal"]  # a title with any of these is left out, e.g. ["senior", "lead"]
 min_salary = 0                           # annual, local currency; only applied when a listing shows salary
 
 # Plain-English preferences the LLM weighs when scoring.
@@ -24,6 +41,11 @@ I want hands-on work in my field, hybrid or remote.
 Prefer product companies over agencies. No roles requiring security clearance.
 """
 
-model = "gemma3:12b"                     # any model from `ollama list`
+# Any model from `ollama list`. Measured on an M1 Pro, scoring 15 jobs with known answers:
+#   qwen3:8b    ~5s per job, 13/15 right   <- default: about 1.5 hours for 1000 new jobs
+#   gemma3:12b  ~16s per job, 14/15 right
+#   gemma3:4b   ~6s per job, 9/15 right (rates senior and off-field jobs as fits)
+# Bigger models (27B+) can take a minute or more per job.
+model = "qwen3:8b"
 min_score = 60                           # only review jobs scoring at least this
 top_n = 15                               # max jobs to review per run

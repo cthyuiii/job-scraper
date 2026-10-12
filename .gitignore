@@ -5,3 +5,6 @@ jobs.db
 applications/
 resume*
 *.pdf
+scan.log
+scheduled.log
+.impeccable/review/

@@ -10,7 +10,7 @@ Resumes must be PDF or .txt. For a Word resume, use File > Save As > PDF.
 ```sh
 brew install ollama python@3.12        # jobspy needs Python <= 3.12
 brew services start ollama             # keeps Ollama running, also after reboot
-ollama pull gemma3:12b                 # or any model; set it in prefs.toml
+ollama pull qwen3:8b                   # or any model; set it in prefs.toml
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cp prefs.example.toml prefs.toml       # then edit it
 ```
@@ -19,7 +19,7 @@ cp prefs.example.toml prefs.toml       # then edit it
 ```powershell
 winget install Ollama.Ollama           # runs in the tray, starts with Windows
 winget install Python.Python.3.12
-ollama pull gemma3:12b
+ollama pull qwen3:8b
 py -3.12 -m venv .venv; .venv\Scripts\pip install -r requirements.txt
 copy prefs.example.toml prefs.toml     # then edit it
 ```
@@ -34,10 +34,18 @@ On Linux, add `--network host -e OLLAMA_URL=http://localhost:11434`. The contain
 
 ## Use
 
+**The page** (start it from this folder, then open http://localhost:8501):
+```sh
+.venv/bin/streamlit run app.py
+```
+Upload your resume in the sidebar, pick the country, state, work types (remote, hybrid, on-site) and job sites under **Search settings** (saved to `prefs.toml`), and press **Scan for new jobs**. Only remote can be filtered during the search; the model reads each job's work type while scoring, and jobs of a type you didn't pick are listed as Excluded. Every job is listed as **In** (at or above your minimum score), **Out**, **Excluded** (dropped by `exclude_title_keywords` or `min_salary`, with the reason) or **Not scored** yet. While a scan runs, the page shows which search it's on (site, job title, page) and then how many jobs are scored with the time left; **Stop scan** keeps what was found so far. Sort the table by score, date posted, date scored or country. **Search** looks through every job, including the full description; every word you type must appear somewhere. Under Search settings, **Title must include one of** (e.g. intern, internship) is added to every search, so the sites return mostly those roles, and any other title is listed as Excluded. Excluded jobs only show under **Show: Excluded**. **Clear all jobs**, above the table, empties `jobs.db` after a confirmation. The table grows with the list, and the selected job's details stay in view as you scroll. Drag **Minimum score** to move the cutoff; the chart shows where it falls. Select a job to see why it scored that way, what's missing, and a link to the posting. The page runs only on your computer and sends Streamlit no usage data.
+
+**The command line** (for drafting, tracking and scheduled runs):
 ```sh
 .venv/bin/python main.py resume.pdf                # search, score, then review
 .venv/bin/python main.py resume.pdf --review-only  # review saved matches
 .venv/bin/python main.py resume.pdf --rescore      # after editing your resume or prefs.toml
+.venv/bin/python main.py resume.pdf --full-search  # search back max_age_days again, e.g. after raising max_jobs
 .venv/bin/python main.py --track                   # mark applied / interview / rejected / offer
 ```
 
@@ -45,9 +53,30 @@ For each match you see the score, why it fits, and what's missing. Press `d` to 
 
 List the companies you want most under `companies` in `prefs.toml`. Each one is searched directly, and its jobs are shown first in review with a ★.
 
-The first search looks back `max_age_days` (default 90). After that, each run only looks back to the previous run, and `jobs.db` remembers every job so none is scored twice. Scoring takes about 15s per job on an M1 Pro with `gemma3:12b`, so the first run can take an hour with several companies and job titles. Later runs take minutes.
+The first search looks back `max_age_days` (default 90). After that, each run only looks back to the previous run, and `jobs.db` remembers every job so none is scored twice. Each scan collects up to `max_jobs` (default 1000), split evenly over every search (job titles x companies x sites). Sites rank recent postings first, so a bigger number reaches further back. After raising it, run once with `--full-search`.
 
-If LinkedIn keeps finding 0 jobs, it's blocking you. Add proxies in `prefs.toml`.
+Jobs whose title matches `exclude_title_keywords`, or whose listed salary is under `min_salary`, are skipped without scoring, and the output says why.
+
+## Speed and model choice
+
+The default model, `qwen3:8b`, scores a job in about 5 seconds on an M1 Pro, so a full 1000-job first scan takes about an hour and a half; later scans only score new postings. It got 13 of 15 jobs with known answers right. `gemma3:12b` got 14 but takes about 16 seconds per job. `gemma3:4b` is no faster than `qwen3:8b` and rated senior and off-field jobs as fits. Bigger models (27B and up) can take a minute or more per job, which turns a first scan into a day.
+
+## Job sites
+
+`prefs.toml` lists all 8 sites jobspy supports. When tested (Sep 2026, jobspy 1.1.82), only Indeed and LinkedIn returned jobs. ZipRecruiter and Bayt blocked the requests, Naukri asked for a CAPTCHA, and Glassdoor, Google and bdjobs are broken inside jobspy. The blocked ones may work from another network or through proxies.
+
+## LinkedIn proxies
+
+LinkedIn limits how many searches one internet connection can make. When it blocks you, LinkedIn searches find 0 jobs; waiting an hour or two usually clears it. If it keeps happening:
+
+1. Buy **rotating residential** proxies from a provider such as Webshare, IPRoyal, Decodo, Bright Data or Oxylabs. They're billed per GB, and this tool uses little data. Cheaper "datacenter" proxies get blocked by LinkedIn almost at once. Avoid free proxy lists: they're unreliable and see your traffic.
+2. The provider gives you a host, port, username and password. Add them to `prefs.toml`:
+   ```toml
+   proxies = ["username:password@host:port"]
+   ```
+   You can list several; jobspy rotates through them. Proxies apply to every site.
+
+No LinkedIn account is used, so a block never affects your own LinkedIn profile.
 
 ## Run it every morning
 

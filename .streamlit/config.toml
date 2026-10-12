@@ -1,0 +1,33 @@
+[client]
+toolbarMode = "minimal"   # hides Deploy; this app is never hosted
+
+[server]
+maxUploadSize = 10
+
+[browser]
+gatherUsageStats = false   # Streamlit sends usage stats by default; nothing leaves this machine
+
+[theme]
+baseRadius = "small"
+
+[theme.light]
+primaryColor = "#18794E"
+backgroundColor = "#F7F9F8"
+secondaryBackgroundColor = "#EAF0EC"
+textColor = "#16201B"
+borderColor = "#D3DCD6"
+greenColor = "#18794E"
+grayColor = "#6B7480"
+orangeColor = "#B4610E"
+blueColor = "#2F6FB3"
+
+[theme.dark]
+primaryColor = "#1F8455"
+backgroundColor = "#0E1411"
+secondaryBackgroundColor = "#17201B"
+textColor = "#E2E9E4"
+borderColor = "#27322C"
+greenColor = "#3DB87A"
+grayColor = "#8C96A2"
+orangeColor = "#E08A3C"
+blueColor = "#6AA6E8"

@@ -1,2 +1,4 @@
 python-jobspy==1.1.82
 pypdf==6.19.0
+streamlit==1.65.0
+tomlkit==0.15.1
