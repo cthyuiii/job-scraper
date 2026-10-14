@@ -7,4 +7,6 @@ resume*
 *.pdf
 scan.log
 scheduled.log
-.impeccable/review/
+.claude/
+.codex/
+.impeccable/

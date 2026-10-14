@@ -14,6 +14,7 @@ from main import WORK_TYPES, at, connect, country_code, dropped, load_prefs, off
 PREFS = Path("prefs.toml")
 LOG = Path("scan.log")
 FITS = {"In": "green", "Out": "gray", "Excluded": "orange", "Not scored": "blue"}  # fit -> theme colour
+TAGS = FITS | {"Your company": "violet"}
 SITES = {"indeed": "Indeed", "linkedin": "LinkedIn", "zip_recruiter": "ZipRecruiter", "glassdoor": "Glassdoor",
          "google": "Google Jobs", "bayt": "Bayt", "naukri": "Naukri", "bdjobs": "bdjobs"}
 COUNTRIES = dict(sorted(((c.value[0].split(",")[0], c.value[0].split(",")[-1].title()) for c in Country
@@ -46,6 +47,7 @@ st.html("""<style>
 /* the table grows with the job list, so keep the selected job's details in view while scrolling it */
 [data-testid="stColumn"]:has(.st-key-job-detail) { align-self: stretch; }
 [data-testid="stLayoutWrapper"]:has(> .st-key-job-detail) { position: sticky; top: 4rem; max-height: calc(100vh - 5rem); overflow-y: auto; }
+.st-key-table-head { margin-bottom: .75rem; }  /* room for the table's hover toolbar, which otherwise covers Clear all jobs */
 </style>""")
 if not PREFS.exists():
     st.error("There's no prefs.toml yet. Copy prefs.example.toml to prefs.toml, set your job titles, then reload.")
@@ -279,11 +281,11 @@ if query.strip():
     view = view[matches(view, query)]
 keys, ascending = SORTS[sort]
 view = view.assign(mine=[at(P["companies"], c) for c in view.company]).sort_values(keys, ascending=ascending, na_position="last")
-view = view.assign(Fit=[[f] for f in view.fit]).reset_index(drop=True)
+view = view.assign(Fit=[[f] + ["Your company"] * m for f, m in zip(view.fit, view.mine)]).reset_index(drop=True)
 
 table, detail = st.columns([7, 3], gap="medium")
 with table:
-    shown, clear_col = st.columns([3, 1], vertical_alignment="center")
+    shown, clear_col = st.container(key="table-head").columns([3, 1], vertical_alignment="center")
     shown.caption(f"Showing {len(view):,} of {len(df):,} jobs.")
     if clear_col.button("Clear all jobs…", icon=":material/delete:", width="stretch", disabled=running,
                         help="Stop the scan first." if running else "Delete every saved job and score, after a confirmation."):
@@ -294,29 +296,35 @@ with table:
         st.info("No jobs match. Lower the minimum score, switch Show to In and out, or clear the search.")
         rows = []
     else:
-        cols = ["Fit", "score", "title", "company", "country", "work", "posted", "scored_at"] + (["mine"] if P["companies"] else [])
-        # as tall as its rows: the page scrolls, not the table
-        rows = st.dataframe(view, column_order=cols, hide_index=True, height=38 + 35 * len(view), on_select="rerun",
-                            selection_mode="single-row", placeholder="", key="jobs", column_config={
-                                "Fit": st.column_config.MultiselectColumn("Fit", options=list(FITS), color=list(FITS.values()), width=84),
-                                "score": st.column_config.NumberColumn("Score", format="%d", width=48),
-                                "title": st.column_config.TextColumn("Title", width=145),
-                                "company": st.column_config.TextColumn("Company", width=100),
-                                "country": st.column_config.TextColumn("Country", width=90),
-                                "work": st.column_config.TextColumn("Work", width=60),
-                                "posted": st.column_config.DateColumn("Posted", format="D MMM", width=56),
-                                "scored_at": st.column_config.DateColumn("Scored", format="D MMM", width=56),
-                                "mine": st.column_config.CheckboxColumn("Your list", width=72),
-                            }).selection.rows
+        # a column where every job says the same thing is noise; Scored shows while sorting by it
+        cols = (["Fit", "score", "title", "company"] + [c for c in ("work", "country") if view[c].replace("", None).nunique() > 1]
+                + ["posted"] + (["scored_at"] if sort == "Date scored" else []))
+        if "jobs" not in st.session_state:
+            st.session_state.jobs = {"selection": {"cells": [[0, "title"]]}}  # open the top job on arrival
+        # as tall as its rows: the page scrolls, not the table. Clicking any cell opens that job.
+        cells = st.dataframe(view, column_order=cols, hide_index=True, height=38 + 35 * len(view), on_select="rerun",
+                             selection_mode="single-cell", placeholder="", key="jobs", column_config={
+                                 "Fit": st.column_config.MultiselectColumn("Fit", options=list(TAGS), color=list(TAGS.values()),
+                                                                           width=190 if P["companies"] else 96),
+                                 "score": st.column_config.NumberColumn("Score", format="%d", width=52),
+                                 "title": st.column_config.TextColumn("Title", width=240),
+                                 "company": st.column_config.TextColumn("Company", width=140),
+                                 "work": st.column_config.TextColumn("Work", width=72),
+                                 "country": st.column_config.TextColumn("Country", width=100),
+                                 "posted": st.column_config.DateColumn("Posted", format="D MMM", width=64),
+                                 "scored_at": st.column_config.DateColumn("Scored", format="D MMM", width=64),
+                             }).selection.cells
+        rows = [r for r, _ in cells]
 
 with detail, st.container(key="job-detail"):
     if not rows or rows[0] >= len(view):
-        st.caption("Select a job to see why it's in or out.")
+        st.caption("Click a job to see why it's in or out.")
     else:
         j = view.iloc[rows[0]]
         st.subheader(j.title)
         st.write(", ".join(filter(None, [j.company, j.location])) + (f" ({j.work})" if j.work else ""))
         st.badge(j.fit if pd.isna(j.score) else f"{j.fit}, score {j.score:.0f}", color=FITS[j.fit])
+        st.caption(" · ".join(f"{label} {d:%-d %b %Y}" for label, d in [("Posted", j.posted), ("Scored", j.scored_at)] if pd.notna(d)))
         st.markdown(f"**Why:** {j.why}" if j.why else "Not scored yet. It gets a score later in the scan.")
         if j.gaps:
             st.markdown("**Missing:**\n" + "\n".join(f"- {g}" for g in j.gaps.split("; ")))
